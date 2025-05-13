@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Dict
 
 app = FastAPI()
 
@@ -9,25 +10,22 @@ app = FastAPI()
 def root():
     return {"message": "FastAPI server is online!"}
 
-# In-memory storage for latest OTPs
-otp_storage = {}
+otp_store: Dict[str, Dict] = {}  # sender_name → { message, timestamp }
 
 class SmsMessage(BaseModel):
-    sender: str
+    sender: str  # This will be VFS
     message: str
-    timestamp: str = None
+    timestamp: str
 
 @app.post("/sms-webhook")
-async def receive_sms(msg: SmsMessage):
-    otp_storage[msg.sender] = {
-        "message": msg.message,
-        "timestamp": msg.timestamp or datetime.utcnow().isoformat()
+async def receive_sms(sms: SmsMessage):
+    print(f"📨 SMS received from {sms.sender}: {sms.message}")
+    otp_store[sms.sender] = {
+        "message": sms.message,
+        "timestamp": sms.timestamp
     }
-    print(f"📨 SMS received from {msg.sender}: {msg.message}")
     return {"status": "received"}
 
 @app.get("/otp/{sender}")
-def get_latest_otp(sender: str):
-    if sender in otp_storage:
-        return otp_storage[sender]
-    return {"error": "No OTP found for this sender"}
+async def get_latest_otp(sender: str):
+    return otp_store.get(sender, {"message": None, "timestamp": None})
