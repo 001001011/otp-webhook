@@ -23,7 +23,8 @@ def normalize_sender(sender: str) -> str:
 
 @app.post("/sms-webhook")
 async def receive_sms(sms: SmsMessage):
-    sender_key = normalize_sender(sms.sender)
+    # Clean up the sender string
+    sender_key = sms.sender.strip().upper().replace("FROM :", "").strip()
 
     otp_store[sender_key] = {
         "message": sms.message,
