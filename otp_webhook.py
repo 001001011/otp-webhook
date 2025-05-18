@@ -8,23 +8,30 @@ app = FastAPI()
 def root():
     return {"message": "✅ FastAPI server is online!"}
 
-otp_store: Dict[str, Dict] = {}  # sender_name → { message, timestamp }
+# In-memory store: sender → { message, timestamp }
+otp_store: Dict[str, Dict] = {}
 
 class SmsMessage(BaseModel):
-    sender: str  # Ex: 'VFS' or '+905312345678'
+    sender: str  # Can be a phone number or service name
     message: str
     timestamp: str
 
 def normalize_sender(sender: str) -> str:
-    sender = sender.strip().replace(" ", "").replace("-", "")
+    sender = sender.strip().lower()
+
+    # Remove any "from", colons, and extra spacing
+    if sender.startswith("from"):
+        sender = sender.replace("from", "").replace(":", "").strip()
+
+    # Normalize Turkish mobile format: 905xx… → +905xx…
     if sender.startswith("90") and not sender.startswith("+"):
         sender = "+" + sender
-    return sender
+
+    return sender.upper()  # Use upper-case keys in store
 
 @app.post("/sms-webhook")
 async def receive_sms(sms: SmsMessage):
-    # Clean up the sender string
-    sender_key = sms.sender.strip().upper().replace("FROM :", "").strip()
+    sender_key = normalize_sender(sms.sender)
 
     otp_store[sender_key] = {
         "message": sms.message,
@@ -38,5 +45,5 @@ async def receive_sms(sms: SmsMessage):
 
 @app.get("/otp/{sender}")
 async def get_latest_otp(sender: str):
-    normalized_sender = normalize_sender(sender)
-    return otp_store.get(normalized_sender, {"message": None, "timestamp": None})
+    sender_key = normalize_sender(sender)
+    return otp_store.get(sender_key, {"message": None, "timestamp": None})
