@@ -15,9 +15,15 @@ class SmsMessage(BaseModel):
     message: str
     timestamp: str
 
+def normalize_sender(sender: str) -> str:
+    sender = sender.strip().replace(" ", "").replace("-", "")
+    if sender.startswith("90") and not sender.startswith("+"):
+        sender = "+" + sender
+    return sender
+
 @app.post("/sms-webhook")
 async def receive_sms(sms: SmsMessage):
-    sender_key = sms.sender.strip()
+    sender_key = normalize_sender(sms.sender)
 
     otp_store[sender_key] = {
         "message": sms.message,
@@ -31,4 +37,5 @@ async def receive_sms(sms: SmsMessage):
 
 @app.get("/otp/{sender}")
 async def get_latest_otp(sender: str):
-    return otp_store.get(sender.strip(), {"message": None, "timestamp": None})
+    normalized_sender = normalize_sender(sender)
+    return otp_store.get(normalized_sender, {"message": None, "timestamp": None})
